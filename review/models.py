@@ -1,13 +1,16 @@
 """Just an empty models file to let the testrunner recognize this as app."""
+import datetime
 from django.conf import settings
 from django.contrib.contenttypes import fields
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
+from django.utils.text import capfirst
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from hvad.models import TranslatableModel, TranslatedFields
+
 
 DEFAULT_CHOICES = (
     ('5', '5'),
@@ -16,6 +19,22 @@ DEFAULT_CHOICES = (
     ('2', '2'),
     ('1', '1'),
 )
+
+
+@python_2_unicode_compatible
+class ReviewContentFilter(models.Model):
+
+    config_name = models.CharField(
+        max_length=256,
+        verbose_name=_('Content Filter Name'),
+    )
+
+    is_default = models.NullBooleanField()
+
+    # allowed_content_types = # See apps.py
+
+    def __str__(self):
+        return self.config_name
 
 
 @python_2_unicode_compatible
@@ -39,13 +58,19 @@ class Review(models.Model):
 
     """
     # GFK 'reviewed_item'
-    content_type = models.ForeignKey(ContentType)
+    content_type = models.ForeignKey(ContentType, verbose_name='Reviewed Item')
     object_id = models.PositiveIntegerField()
     reviewed_item = fields.GenericForeignKey('content_type', 'object_id')
 
     user = models.ForeignKey(
         getattr(settings, 'AUTH_USER_MODEL', 'auth.User'),
         verbose_name=_('User'),
+        blank=True, null=True,
+    )
+
+    content_filter = models.ForeignKey(
+        ReviewContentFilter,
+        verbose_name=_('Content Filter'),
         blank=True, null=True,
     )
 
@@ -66,8 +91,14 @@ class Review(models.Model):
     )
 
     creation_date = models.DateTimeField(
-        auto_now_add=True,
+        default=datetime.datetime.now,
         verbose_name=_('Creation date'),
+        null=True
+    )
+
+    last_updated = models.DateTimeField(
+        verbose_name=_('Last Updated'),
+        null=True
     )
 
     average_rating = models.FloatField(
@@ -86,10 +117,17 @@ class Review(models.Model):
         'extra_content_type', 'extra_object_id')
 
     class Meta:
-        ordering = ['-creation_date']
+        #ordering = ['-creation_date']
+        pass
 
     def __str__(self):
-        return '{0} - {1}'.format(self.reviewed_item, self.get_user())
+        ctype = str(ContentType.objects.get_for_model(self.reviewed_item))
+        return '{0}::{1} by {2} on {3}'.format(
+            capfirst(ctype),
+            self.reviewed_item,
+            self.get_user(),
+            self.creation_date.strftime('%Y-%m-%d %H:%M')
+        )
 
     # TODO: Add magic to get ReviewExtraInfo content objects here
 

@@ -3,3 +3,4 @@ django-user-media
 django-hvad
 Pillow
 django-libs
+django-multiselectfield
